@@ -8,6 +8,8 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
+void htpack_decode(unsigned char *data, int len);
+
 
 struct http2_frame_t {
   int type = 0;
@@ -17,13 +19,16 @@ struct http2_frame_t {
 
   void dump() {
     printf("  type : %d\n", type);
-    printf("  flags: %d\n", flags);
+    printf("  flags: 0x%x\n", flags);
     printf("  si   : %d\n", si);
     printf("  dlen : %ld\n", data.size());
   }
 
   int parse_frame(const std::string &in) {
     if (in.size() < 9) return 0;
+for (int i=0; i<in.size(); i++)
+  printf("%02x ", (unsigned char)in[i]);
+printf("\n");
     const unsigned char *uchar = (unsigned char*)in.data();
     int size = uchar[0]<<16 | uchar[1]<<8 | uchar[2];
     if (in.size() < (size_t)(size+9)) return 0;
@@ -118,7 +123,10 @@ struct hcon_t {
         }
 
         if (frame.type == 1) { //headers
+          int skip = 0;
+          if (frame.flags & 0x20) skip += 5; //priority
           //const unsigned char resp[] = {0x88};
+          htpack_decode((unsigned char*)frame.data.data()+skip, frame.data.size()-skip);
           const unsigned char resp[] = {0x88, 0x5c, 1, 0x38,    0x5f, 9, 't', 'e', 'x', 't', '/', 'h', 't', 'm', 'l'};
           send_frame(1, 4, resp, sizeof(resp), frame.si);
           send_frame(0, 1, (unsigned char*)"nazdar \n", 8, frame.si);
